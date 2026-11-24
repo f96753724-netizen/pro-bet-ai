@@ -592,6 +592,112 @@ def goals_analysis(home_id, away_id):
         "warning": "Se frekans istorik, se pa garanti rezilta pwochen match."
     })
     
+@app.route("/final-analysis/<int:home_id>/<int:away_id>")
+def final_analysis(home_id, away_id):
+
+    client = app.test_client()
+
+    goals_response = client.get(
+        f"/goals-analysis/{home_id}/{away_id}"
+    )
+
+    stats_response = client.get(
+        f"/predict/{home_id}/{away_id}"
+    )
+
+    if goals_response.status_code != 200:
+        return jsonify({
+            "error": "Erè nan analiz gòl"
+        }), 502
+
+    if stats_response.status_code != 200:
+        return jsonify({
+            "error": "Erè nan analiz estatistik"
+        }), 502
+
+    goals = goals_response.get_json()
+    stats = stats_response.get_json()
+
+    home = goals["home_team"]
+    away = goals["away_team"]
+    h2h = goals["head_to_head_goals"]
+
+    picks = []
+
+    def add_pick(name, count, total, source):
+        if total > 0:
+            picks.append({
+                "market": name,
+                "historical_hits": count,
+                "matches": total,
+                "frequency_percent": round(
+                    count / total * 100, 1
+                ),
+                "source": source
+            })
+
+    add_pick(
+        "Over 1.5",
+        home["over_1_5"] + away["over_1_5"],
+        home["matches_analyzed"] + away["matches_analyzed"],
+        "Last 5 matches per team"
+    )
+
+    add_pick(
+        "Over 2.5",
+        home["over_2_5"] + away["over_2_5"],
+        home["matches_analyzed"] + away["matches_analyzed"],
+        "Last 5 matches per team"
+    )
+
+    add_pick(
+        "Over 3.5",
+        home["over_3_5"] + away["over_3_5"],
+        home["matches_analyzed"] + away["matches_analyzed"],
+        "Last 5 matches per team"
+    )
+
+    add_pick(
+        "BTTS",
+        home["btts"] + away["btts"],
+        home["matches_analyzed"] + away["matches_analyzed"],
+        "Last 5 matches per team"
+    )
+
+    add_pick(
+        "H2H Over 2.5",
+        h2h["over_2_5"],
+        h2h["matches_analyzed"],
+        "Head to head"
+    )
+
+    add_pick(
+        "H2H BTTS",
+        h2h["btts"],
+        h2h["matches_analyzed"],
+        "Head to head"
+    )
+
+    picks.sort(
+        key=lambda item: item["frequency_percent"],
+        reverse=True
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "goals_analysis": goals,
+        "statistical_analysis": stats.get(
+            "predictions", {}
+        ),
+        "ranked_picks": picks,
+        "warning": (
+            "Klasman sa a baze sou frekans istorik, "
+            "li pa garanti yon paryaj ap genyen."
+        )
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
