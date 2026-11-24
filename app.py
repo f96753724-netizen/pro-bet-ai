@@ -362,7 +362,18 @@ def confidence_score(home_id, away_id):
     scores["team_form"] = round(
         (home["wins"] + away["wins"]) / 2, 1
     )
+    overall_confidence = round(
+        sum(scores.values()) / len(scores), 1
+    )
 
+    if overall_confidence >= 80:
+        confidence_level = "Trè wo"
+    elif overall_confidence >= 60:
+        confidence_level = "Wo"
+    elif overall_confidence >= 40:
+        confidence_level = "Mwayen"
+    else:
+        confidence_level = "Ba"
     return jsonify({
         "bot": "PRO BET AI",
         "home_team_id": home_id,
