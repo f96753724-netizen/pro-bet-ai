@@ -1112,6 +1112,22 @@ def basketball_predict(home_id, away_id):
         "warning": "Estimasyon estatistik, se pa rezilta garanti."
     })
     
+@app.route("/basketball/players/<int:game_id>")
+def basketball_players(game_id):
+
+    result, status = sportapi_get(
+        f"/basketball/games/{game_id}/players"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "game_id": game_id,
+        "player_statistics": result.get("data", result)
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
