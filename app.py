@@ -1427,6 +1427,72 @@ def basketball_player_props(player_id, line):
         "warning": "5 match se yon ti echantiyon. Sa pa garanti rezilta."
     })
     
+@app.route("/basketball/player-consistency/<int:player_id>")
+def basketball_player_consistency(player_id):
+
+    result, status = sportapi_get(
+        f"/basketball/players/{player_id}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    data = result.get("data", result)
+    games = data.get("last_games", [])
+
+    played = [
+        g for g in games
+        if g.get("dnp") is None
+        and isinstance(g.get("pts"), (int, float))
+    ][:5]
+
+    if not played:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn match jwè a."
+        }), 404
+
+    points = [g["pts"] for g in played]
+    minutes = [
+        g["minutes"] for g in played
+        if isinstance(g.get("minutes"), (int, float))
+    ]
+
+    thresholds = [15, 20, 25, 30]
+
+    consistency = {}
+
+    for threshold in thresholds:
+        hits = sum(1 for p in points if p >= threshold)
+
+        consistency[str(threshold)] = {
+            "line": threshold,
+            "hits": hits,
+            "matches": len(points),
+            "percentage": round(
+                hits / len(points) * 100, 1
+            )
+        }
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "player": data.get("name"),
+        "player_id": player_id,
+        "matches_analyzed": len(points),
+        "points_per_game": points,
+        "average_points": round(
+            sum(points) / len(points), 1
+        ),
+        "highest_points": max(points),
+        "lowest_points": min(points),
+        "average_minutes": (
+            round(sum(minutes) / len(minutes), 1)
+            if minutes else None
+        ),
+        "consistency": consistency,
+        "warning": "Estatistik pase pa garanti pwochen pèfòmans."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
