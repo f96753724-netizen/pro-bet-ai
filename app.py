@@ -375,16 +375,18 @@ def confidence_score(home_id, away_id):
     else:
         confidence_level = "Ba"
     return jsonify({
-        "bot": "PRO BET AI",
-        "home_team_id": home_id,
-        "away_team_id": away_id,
-        "confidence_scores": scores,
-        "team_statistics": {
-            "home": home,
-            "away": away
-        },
-        "warning": "Nòt sa yo se endikatè estatistik sou 5 dènye match yo, se pa pwobabilite garanti."
-    })
+    "bot": "PRO BET AI",
+    "home_team_id": home_id,
+    "away_team_id": away_id,
+    "confidence_scores": scores,
+    "overall_confidence": overall_confidence,
+    "confidence_level": confidence_level,
+    "team_statistics": {
+        "home": home,
+        "away": away
+    },
+    "warning": "Nòt sa yo se endikatè estatistik, se pa pwobabilite garanti."
+})
 @app.route("/basketball")
 def basketball():
     match_date = request.args.get("date", date.today().isoformat())
