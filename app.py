@@ -1220,6 +1220,93 @@ def basketball_full_report(game_id):
         "players_available": players_status == 200
     })
     
+@app.route("/basketball/over-under/<int:home_id>/<int:away_id>/<int:line>")
+def basketball_over_under(home_id, away_id, line):
+
+    def get_form(team_id):
+        result, status = sportapi_get(
+            f"/basketball/teams/{team_id}"
+        )
+
+        if status != 200:
+            return None
+
+        data = result.get("data", result)
+        games = data.get("last_games", [])
+
+        finished = [
+            g for g in games
+            if g.get("status") in ["FT", "AOT"]
+        ][:5]
+
+        scored = []
+        conceded = []
+
+        for game in finished:
+            home = game.get("home", {})
+            away = game.get("away", {})
+
+            if home.get("id") == team_id:
+                mine, opponent = home, away
+            elif away.get("id") == team_id:
+                mine, opponent = away, home
+            else:
+                continue
+
+            if mine.get("score") is None or opponent.get("score") is None:
+                continue
+
+            scored.append(mine["score"])
+            conceded.append(opponent["score"])
+
+        if not scored:
+            return None
+
+        return {
+            "scored": sum(scored) / len(scored),
+            "conceded": sum(conceded) / len(conceded),
+            "matches": len(scored)
+        }
+
+    home = get_form(home_id)
+    away = get_form(away_id)
+
+    if not home or not away:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Done ekip yo pa disponib."
+        }), 404
+
+    predicted_home = (
+        home["scored"] + away["conceded"]
+    ) / 2
+
+    predicted_away = (
+        away["scored"] + home["conceded"]
+    ) / 2
+
+    total = round(predicted_home + predicted_away, 1)
+
+    if total > line:
+        decision = "OVER"
+    elif total < line:
+        decision = "UNDER"
+    else:
+        decision = "EQUAL"
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "line": line,
+        "predicted_home_points": round(predicted_home, 1),
+        "predicted_away_points": round(predicted_away, 1),
+        "predicted_total": total,
+        "decision": decision,
+        "difference_from_line": round(total - line, 1),
+        "warning": "Estimasyon estatistik, se pa garanti."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
