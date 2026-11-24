@@ -1675,6 +1675,86 @@ def basketball_matchup(player_id, opponent_id):
         "warning": "Analiz estatistik sèlman; se pa yon pwobabilite garanti."
     })
     
+@app.route("/basketball/advanced-props/<int:player_id>")
+def basketball_advanced_props(player_id):
+
+    result, status = sportapi_get(
+        f"/basketball/players/{player_id}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    data = result.get("data", result)
+    games = data.get("last_games", [])
+
+    played = [
+        g for g in games
+        if g.get("dnp") is None
+    ][:5]
+
+    if not played:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn dènye match jwè a."
+        }), 404
+
+    categories = {
+        "points": ("pts", 25.5),
+        "rebounds": ("reb", 10.5),
+        "assists": ("ast", 8.5),
+        "three_pointers": ("tpm", 1.5)
+    }
+
+    analysis = {}
+
+    for name, (field, default_line) in categories.items():
+
+        try:
+            line = float(request.args.get(name, default_line))
+        except (ValueError, TypeError):
+            return jsonify({
+                "bot": "PRO BET AI",
+                "error": f"Liy {name} la pa valab."
+            }), 400
+
+        values = [
+            g[field] for g in played
+            if isinstance(g.get(field), (int, float))
+        ]
+
+        if not values:
+            analysis[name] = {
+                "line": line,
+                "matches_available": 0,
+                "average": None,
+                "over_hits": None,
+                "over_percentage": None
+            }
+            continue
+
+        hits = sum(1 for value in values if value > line)
+
+        analysis[name] = {
+            "line": line,
+            "matches_available": len(values),
+            "average": round(sum(values) / len(values), 1),
+            "over_hits": hits,
+            "under_or_equal_hits": len(values) - hits,
+            "over_percentage": round(
+                hits / len(values) * 100, 1
+            )
+        }
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "player": data.get("name"),
+        "player_id": player_id,
+        "matches_analyzed": len(played),
+        "analysis": analysis,
+        "warning": "Rezilta istorik yo pa garanti pwochen pèfòmans."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
