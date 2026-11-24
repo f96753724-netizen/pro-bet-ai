@@ -780,33 +780,7 @@ def basketball_analyze(game_id):
         "warning": "Analiz estatistik, pa garanti rezilta paryaj."
     })
     
-@app.route("/basketball/team-last5/<int:team_id>")
-def basketball_team_last5(team_id):
 
-    result, status = sportapi_get(
-        f"/basketball/teams/{team_id}/games?limit=30"
-    )
-
-    if status != 200:
-        return jsonify(result), status
-
-    games = result.get("data", [])
-
-    if isinstance(games, dict):
-        games = games.get("games", [])
-
-    finished = [
-        game for game in games
-        if game.get("status") in ["FT", "AOT"]
-    ]
-
-    finished = finished[:5]
-
-    if not finished:
-        return jsonify({
-            "bot": "PRO BET AI",
-            "error": "Pa gen ase match fini pou ekip sa a."
-        }), 404
 
     scored = []
     conceded = []
