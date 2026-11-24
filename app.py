@@ -1563,6 +1563,118 @@ def basketball_player_vs(player_id, opponent_id):
         "warning": "Ti kantite match ka bay yon echantiyon limite."
     })
     
+@app.route("/basketball/matchup/<int:player_id>/<int:opponent_id>")
+def basketball_matchup(player_id, opponent_id):
+
+    player_result, player_status = sportapi_get(
+        f"/basketball/players/{player_id}"
+    )
+
+    if player_status != 200:
+        return jsonify(player_result), player_status
+
+    opponent_result, opponent_status = sportapi_get(
+        f"/basketball/teams/{opponent_id}"
+    )
+
+    if opponent_status != 200:
+        return jsonify(opponent_result), opponent_status
+
+    player_data = player_result.get("data", player_result)
+    opponent_data = opponent_result.get("data", opponent_result)
+
+    player_games = player_data.get("last_games", [])
+    opponent_games = opponent_data.get("last_games", [])
+
+    played = [
+        g for g in player_games
+        if g.get("dnp") is None
+        and isinstance(g.get("pts"), (int, float))
+    ][:5]
+
+    if not played:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn 5 dènye match jwè a."
+        }), 404
+
+    fields = {
+        "points": "pts",
+        "rebounds": "reb",
+        "assists": "ast",
+        "three_pointers": "tpm",
+        "steals": "stl",
+        "blocks": "blk"
+    }
+
+    player_averages = {}
+
+    for name, field in fields.items():
+        values = [
+            g[field] for g in played
+            if isinstance(g.get(field), (int, float))
+        ]
+
+        player_averages[name] = (
+            round(sum(values) / len(values), 1)
+            if values else None
+        )
+
+    versus = [
+        g for g in player_games
+        if g.get("dnp") is None
+        and g.get("opponent", {}).get("id") == opponent_id
+    ]
+
+    opponent_allowed = []
+
+    for game in opponent_games:
+        home = game.get("home", {})
+        away = game.get("away", {})
+
+        if home.get("id") == opponent_id:
+            score = home.get("score")
+            other_score = away.get("score")
+        elif away.get("id") == opponent_id:
+            score = away.get("score")
+            other_score = home.get("score")
+        else:
+            continue
+
+        if isinstance(score, (int, float)) and isinstance(
+            other_score, (int, float)
+        ):
+            opponent_allowed.append(score)
+
+    opponent_defense = {
+        "matches_found": len(opponent_allowed),
+        "average_points_allowed": (
+            round(sum(opponent_allowed) / len(opponent_allowed), 1)
+            if opponent_allowed else None
+        )
+    }
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "player": player_data.get("name"),
+        "player_id": player_id,
+        "opponent_id": opponent_id,
+        "player_last5": player_averages,
+        "matches_vs_opponent": len(versus),
+        "opponent_history": [
+            {
+                "date": g.get("start"),
+                "points": g.get("pts"),
+                "rebounds": g.get("reb"),
+                "assists": g.get("ast"),
+                "result": g.get("result")
+            }
+            for g in versus
+        ],
+        "opponent_defense": opponent_defense,
+        "warning": "Analiz estatistik sèlman; se pa yon pwobabilite garanti."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
