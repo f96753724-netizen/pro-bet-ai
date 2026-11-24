@@ -1755,6 +1755,101 @@ def basketball_advanced_props(player_id):
         "warning": "Rezilta istorik yo pa garanti pwochen pèfòmans."
     })
     
+@app.route("/basketball/team-totals/<int:home_id>/<int:away_id>")
+def basketball_team_totals(home_id, away_id):
+
+    def get_team_totals(team_id):
+        result, status = sportapi_get(
+            f"/basketball/teams/{team_id}"
+        )
+
+        if status != 200:
+            return None
+
+        data = result.get("data", result)
+        games = data.get("last_games", [])
+
+        finished = [
+            g for g in games
+            if g.get("status") in ["FT", "AOT"]
+        ][:5]
+
+        scored = []
+        conceded = []
+        totals = []
+
+        for game in finished:
+            home = game.get("home", {})
+            away = game.get("away", {})
+
+            if home.get("id") == team_id:
+                mine, opponent = home, away
+            elif away.get("id") == team_id:
+                mine, opponent = away, home
+            else:
+                continue
+
+            my_score = mine.get("score")
+            opp_score = opponent.get("score")
+
+            if not isinstance(my_score, (int, float)):
+                continue
+
+            if not isinstance(opp_score, (int, float)):
+                continue
+
+            scored.append(my_score)
+            conceded.append(opp_score)
+            totals.append(my_score + opp_score)
+
+        if not totals:
+            return None
+
+        return {
+            "matches": len(totals),
+            "average_scored": round(sum(scored) / len(scored), 1),
+            "average_conceded": round(sum(conceded) / len(conceded), 1),
+            "average_match_total": round(sum(totals) / len(totals), 1),
+            "match_totals": totals
+        }
+
+    home = get_team_totals(home_id)
+    away = get_team_totals(away_id)
+
+    if not home or not away:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn ase match fini pou 2 ekip yo."
+        }), 404
+
+    projected_home = (
+        home["average_scored"] +
+        away["average_conceded"]
+    ) / 2
+
+    projected_away = (
+        away["average_scored"] +
+        home["average_conceded"]
+    ) / 2
+
+    projected_total = round(
+        projected_home + projected_away, 1
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "home_statistics": home,
+        "away_statistics": away,
+        "projection": {
+            "home_points": round(projected_home, 1),
+            "away_points": round(projected_away, 1),
+            "total_points": projected_total
+        },
+        "warning": "Estimasyon sou 5 match istorik; pa yon garanti."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
