@@ -1355,6 +1355,78 @@ def basketball_player_last5(player_id):
         "averages": averages
     })
     
+@app.route("/basketball/player-props/<int:player_id>/<float:line>")
+def basketball_player_props(player_id, line):
+
+    result, status = sportapi_get(
+        f"/basketball/players/{player_id}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    data = result.get("data", result)
+    games = data.get("last_games", [])
+
+    played = [
+        g for g in games
+        if g.get("dnp") is None
+    ][:5]
+
+    if not played:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn dènye match jwè a."
+        }), 404
+
+    props = {
+        "points": "pts",
+        "rebounds": "reb",
+        "assists": "ast",
+        "three_pointers": "tpm"
+    }
+
+    analysis = {}
+
+    for name, field in props.items():
+
+        values = [
+            g[field] for g in played
+            if isinstance(g.get(field), (int, float))
+        ]
+
+        if not values:
+            analysis[name] = {
+                "average": None,
+                "over_count": 0,
+                "over_percentage": None
+            }
+            continue
+
+        over_count = sum(
+            1 for value in values if value > line
+        )
+
+        analysis[name] = {
+            "average": round(sum(values) / len(values), 1),
+            "line": line,
+            "over_count": over_count,
+            "matches_count": len(values),
+            "over_percentage": round(
+                over_count / len(values) * 100, 1
+            ),
+            "under_or_equal_count": len(values) - over_count
+        }
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "player": data.get("name"),
+        "player_id": player_id,
+        "matches_analyzed": len(played),
+        "analysis": analysis,
+        "warning": "5 match se yon ti echantiyon. Sa pa garanti rezilta."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
