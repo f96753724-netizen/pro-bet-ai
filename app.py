@@ -889,6 +889,26 @@ def basketball_team_last5(team_id):
         "warning": "Estatistik istorik, pa garanti rezilta pwochen match."
     })
     
+@app.route("/basketball/debug-team/<int:team_id>")
+def basketball_debug_team(team_id):
+    result, status = sportapi_get(
+        f"/basketball/teams/{team_id}/games?limit=10"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    games = result.get("data", [])
+
+    return jsonify({
+        "team_id": team_id,
+        "count": len(games),
+        "statuses": [
+            game.get("status") for game in games
+        ],
+        "first_games": games[:3]
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
