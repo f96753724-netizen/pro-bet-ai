@@ -1493,6 +1493,76 @@ def basketball_player_consistency(player_id):
         "warning": "Estatistik pase pa garanti pwochen pèfòmans."
     })
     
+@app.route("/basketball/player-vs/<int:player_id>/<int:opponent_id>")
+def basketball_player_vs(player_id, opponent_id):
+
+    result, status = sportapi_get(
+        f"/basketball/players/{player_id}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    data = result.get("data", result)
+    games = data.get("last_games", [])
+
+    matches = [
+        g for g in games
+        if g.get("dnp") is None
+        and g.get("opponent", {}).get("id") == opponent_id
+    ]
+
+    if not matches:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn match jwè sa a kont ekip sa a.",
+            "player_id": player_id,
+            "opponent_id": opponent_id
+        }), 404
+
+    fields = {
+        "points": "pts",
+        "rebounds": "reb",
+        "assists": "ast",
+        "three_pointers": "tpm",
+        "steals": "stl",
+        "blocks": "blk"
+    }
+
+    averages = {}
+
+    for name, field in fields.items():
+        values = [
+            g[field] for g in matches
+            if isinstance(g.get(field), (int, float))
+        ]
+
+        averages[name] = (
+            round(sum(values) / len(values), 1)
+            if values else None
+        )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "player": data.get("name"),
+        "player_id": player_id,
+        "opponent": matches[0].get("opponent", {}).get("name"),
+        "matches_found": len(matches),
+        "averages_against_opponent": averages,
+        "match_history": [
+            {
+                "date": g.get("start"),
+                "points": g.get("pts"),
+                "rebounds": g.get("reb"),
+                "assists": g.get("ast"),
+                "result": g.get("result"),
+                "score": g.get("score")
+            }
+            for g in matches
+        ],
+        "warning": "Ti kantite match ka bay yon echantiyon limite."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
