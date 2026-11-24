@@ -784,22 +784,7 @@ def basketball_analyze(game_id):
 
     
 
-    for game in finished:
-        home = game.get("home", {})
-        away = game.get("away", {})
-
-        if home.get("id") == team_id:
-            team_score = home.get("score")
-            opponent_score = away.get("score")
-            opponent = away.get("name")
-
-        elif away.get("id") == team_id:
-            team_score = away.get("score")
-            opponent_score = home.get("score")
-            opponent = home.get("name")
-
-        else:
-            continue
+    
 
         if team_score is None or opponent_score is None:
             continue
