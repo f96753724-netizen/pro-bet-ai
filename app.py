@@ -57,7 +57,160 @@ def football():
     )
     return jsonify(data), status
 
+@app.route("/best-matches")
+def best_matches():
+    match_date = request.args.get(
+        "date", date.today().isoformat()
+    )
 
+    result, status = sportapi_get(
+        f"/fixtures/date/{match_date}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    fixtures = result.get("data", [])
+
+    if not isinstance(fixtures, list):
+        return jsonify({"error": "Done match yo pa kòrèk"}), 502
+
+    team_cache = {}
+
+    def get_team_stats(team_id):
+        if team_id in team_cache:
+            return team_cache[team_id]
+
+        data, code = sportapi_get(f"/teams/{team_id}")
+
+        if code != 200:
+            team_cache[team_id] = None
+            return None
+
+        data = data.get("data", data)
+        games = data.get("matches", [])
+
+        finished = [
+            g for g in games
+            if g.get("status") in ["FT", "AET", "PENS"]
+            and g.get("home_score") is not None
+            and g.get("away_score") is not None
+        ]
+
+        finished.sort(
+            key=lambda g: g.get("date", ""),
+            reverse=True
+        )
+
+        finished = finished[:5]
+
+        if len(finished) < 3:
+            team_cache[team_id] = None
+            return None
+
+        scored = []
+        conceded = []
+        form = []
+        over15 = 0
+        over25 = 0
+        btts = 0
+
+        for game in finished:
+            if game.get("home_id") == team_id:
+                goals_for = game["home_score"]
+                goals_against = game["away_score"]
+            else:
+                goals_for = game["away_score"]
+                goals_against = game["home_score"]
+
+            scored.append(goals_for)
+            conceded.append(goals_against)
+
+            total = goals_for + goals_against
+
+            if total > 1.5:
+                over15 += 1
+
+            if total > 2.5:
+                over25 += 1
+
+            if goals_for > 0 and goals_against > 0:
+                btts += 1
+
+            if goals_for > goals_against:
+                form.append("W")
+            elif goals_for == goals_against:
+                form.append("D")
+            else:
+                form.append("L")
+
+        count = len(finished)
+
+        stats = {
+            "matches": count,
+            "average_scored": round(sum(scored) / count, 2),
+            "average_conceded": round(sum(conceded) / count, 2),
+            "over_1_5_frequency": f"{over15}/{count}",
+            "over_2_5_frequency": f"{over25}/{count}",
+            "btts_frequency": f"{btts}/{count}",
+            "form": form
+        }
+
+        team_cache[team_id] = stats
+        return stats
+
+    ranked = []
+
+    scheduled = [
+        match for match in fixtures
+        if match.get("status") in ["NS", "Scheduled"]
+    ]
+
+    for match in scheduled[:12]:
+        home_id = match.get("home_id")
+        away_id = match.get("away_id")
+
+        if not home_id or not away_id:
+            continue
+
+        home = get_team_stats(home_id)
+        away = get_team_stats(away_id)
+
+        if not home or not away:
+            continue
+
+        expected_goals = round(
+            (
+                home["average_scored"]
+                + home["average_conceded"]
+                + away["average_scored"]
+                + away["average_conceded"]
+            ) / 2, 2
+        )
+
+        ranked.append({
+            "fixture_id": match.get("id"),
+            "home_team": match.get("home_team"),
+            "away_team": match.get("away_team"),
+            "expected_goals_indicator": expected_goals,
+            "home_stats": home,
+            "away_stats": away
+        })
+
+    ranked.sort(
+        key=lambda x: x["expected_goals_indicator"],
+        reverse=True
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "category": "BEST MATCHES",
+        "date": match_date,
+        "matches_checked": min(len(scheduled), 12),
+        "matches_analyzed": len(ranked),
+        "best_matches": ranked[:5],
+        "warning": "Frekans yo baze sou dènye match yo; yo pa garanti rezilta pwochen match la."
+    })
 @app.route("/basketball")
 def basketball():
     match_date = request.args.get("date", date.today().isoformat())
