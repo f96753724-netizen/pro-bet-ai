@@ -1186,6 +1186,40 @@ def basketball_top_players(game_id):
         "top_10_players": top_players
     })
     
+@app.route("/basketball/full-report/<int:game_id>")
+def basketball_full_report(game_id):
+
+    game, game_status = sportapi_get(
+        f"/basketball/games/{game_id}"
+    )
+
+    if game_status != 200:
+        return jsonify(game), game_status
+
+    stats, stats_status = sportapi_get(
+        f"/basketball/games/{game_id}/stats"
+    )
+
+    players, players_status = sportapi_get(
+        f"/basketball/games/{game_id}/players"
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "game_id": game_id,
+        "match": game.get("data", game),
+        "team_statistics": (
+            stats.get("data", stats)
+            if stats_status == 200 else None
+        ),
+        "player_statistics": (
+            players.get("data", players)
+            if players_status == 200 else None
+        ),
+        "stats_available": stats_status == 200,
+        "players_available": players_status == 200
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
