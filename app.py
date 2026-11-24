@@ -1128,6 +1128,64 @@ def basketball_players(game_id):
         "player_statistics": result.get("data", result)
     })
     
+@app.route("/basketball/top-players/<int:game_id>")
+def basketball_top_players(game_id):
+
+    result, status = sportapi_get(
+        f"/basketball/games/{game_id}/players"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    data = result.get("data", result)
+
+    players = []
+
+    def extract_players(obj):
+        if isinstance(obj, dict):
+            if any(k in obj for k in ["points", "pts"]):
+                players.append(obj)
+            else:
+                for value in obj.values():
+                    extract_players(value)
+
+        elif isinstance(obj, list):
+            for item in obj:
+                extract_players(item)
+
+    extract_players(data)
+
+    if not players:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn estatistik jwè yo."
+        }), 404
+
+    players.sort(
+        key=lambda p: p.get("points", p.get("pts", 0)) or 0,
+        reverse=True
+    )
+
+    top_players = []
+
+    for player in players[:10]:
+        top_players.append({
+            "name": player.get("name", player.get("player_name")),
+            "points": player.get("points", player.get("pts")),
+            "rebounds": player.get("rebounds", player.get("reb")),
+            "assists": player.get("assists", player.get("ast")),
+            "three_pointers": player.get(
+                "three_pointers", player.get("tpm")
+            )
+        })
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "game_id": game_id,
+        "top_10_players": top_players
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
