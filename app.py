@@ -1307,6 +1307,54 @@ def basketball_over_under(home_id, away_id, line):
         "warning": "Estimasyon estatistik, se pa garanti."
     })
     
+@app.route("/basketball/player-last5/<int:player_id>")
+def basketball_player_last5(player_id):
+
+    result, status = sportapi_get(
+        f"/basketball/players/{player_id}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    data = result.get("data", result)
+    games = data.get("last_games", [])
+
+    played = [
+        g for g in games
+        if g.get("dnp") is None
+    ][:5]
+
+    if not played:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa jwenn 5 dènye match jwè sa a."
+        }), 404
+
+    fields = ["pts", "reb", "ast", "stl", "blk", "tpm"]
+
+    averages = {}
+
+    for field in fields:
+        values = [
+            g.get(field) for g in played
+            if isinstance(g.get(field), (int, float))
+        ]
+
+        averages[field] = (
+            round(sum(values) / len(values), 1)
+            if values else None
+        )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "player": data.get("name"),
+        "player_id": player_id,
+        "matches_found": len(played),
+        "last_matches": played,
+        "averages": averages
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
