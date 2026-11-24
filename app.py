@@ -397,6 +397,75 @@ def head_to_head(home_id, away_id):
         "head_to_head": data
     })
     
+@app.route("/full-analysis/<int:home_id>/<int:away_id>")
+def full_analysis(home_id, away_id):
+
+    # Analiz estatistik ekip yo
+    prediction_response = predict_match(home_id, away_id)
+
+    if isinstance(prediction_response, tuple):
+        return prediction_response
+
+    prediction = prediction_response.get_json()
+
+    # Analiz rankont dirèk yo
+    h2h_data, h2h_status = sportapi_get(
+        f"/fixtures/h2h/{home_id}/{away_id}"
+    )
+
+    if h2h_status != 200:
+        return jsonify(h2h_data), h2h_status
+
+    matches = h2h_data.get("data", [])
+
+    wins_home = 0
+    wins_away = 0
+    draws = 0
+    goals_home = 0
+    goals_away = 0
+
+    for match in matches:
+        home_is_home = match.get("home_id") == home_id
+
+        home_goals = (
+            match.get("home_score") if home_is_home
+            else match.get("away_score")
+        )
+
+        away_goals = (
+            match.get("away_score") if home_is_home
+            else match.get("home_score")
+        )
+
+        if home_goals is None or away_goals is None:
+            continue
+
+        goals_home += home_goals
+        goals_away += away_goals
+
+        if home_goals > away_goals:
+            wins_home += 1
+        elif away_goals > home_goals:
+            wins_away += 1
+        else:
+            draws += 1
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "statistical_prediction": prediction.get("predictions"),
+        "head_to_head": {
+            "matches_found": len(matches),
+            "home_wins": wins_home,
+            "away_wins": wins_away,
+            "draws": draws,
+            "home_goals": goals_home,
+            "away_goals": goals_away
+        },
+        "warning": "Analiz sa a baze sou done istorik; li pa garanti rezilta paryaj."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
