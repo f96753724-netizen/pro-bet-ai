@@ -110,6 +110,31 @@ def analyze(fixture_id):
         }
     })
     
+@app.route("/team-last5/<int:team_id>")
+def team_last5(team_id):
+    data, status = sportapi_get(f"/teams/{team_id}")
+
+    if status != 200:
+        return jsonify(data), status
+
+    matches = data.get("matches", [])
+
+    played = [
+        match for match in matches
+        if match.get("status") in ["FT", "AET", "PENS"]
+    ]
+
+    played.sort(
+        key=lambda match: match.get("date", ""),
+        reverse=True
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "team_id": team_id,
+        "last_5_matches": played[:5]
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
