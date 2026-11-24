@@ -2285,6 +2285,154 @@ def main_menu():
     </html>
     """
     
+def analyze_team_for_top(games, team_id):
+    played = [
+        g for g in games
+        if g.get("status") in ["FT", "AET", "PENS"]
+        and g.get("home_score") is not None
+        and g.get("away_score") is not None
+        and team_id in [g.get("home_id"), g.get("away_id")]
+    ]
+
+    played.sort(
+        key=lambda g: g.get("date", ""),
+        reverse=True
+    )
+
+    last5 = played[:5]
+
+    if len(last5) < 3:
+        return None
+
+    over15 = 0
+    over25 = 0
+    btts = 0
+    wins = 0
+
+    for game in last5:
+        if game.get("home_id") == team_id:
+            gf = game["home_score"]
+            ga = game["away_score"]
+        else:
+            gf = game["away_score"]
+            ga = game["home_score"]
+
+        if gf + ga >= 2:
+            over15 += 1
+        if gf + ga >= 3:
+            over25 += 1
+        if gf > 0 and ga > 0:
+            btts += 1
+        if gf > ga:
+            wins += 1
+
+    n = len(last5)
+
+    return {
+        "matches": n,
+        "over_1_5": over15 / n * 100,
+        "over_2_5": over25 / n * 100,
+        "btts": btts / n * 100,
+        "wins": wins / n * 100
+    }
+
+
+@app.route("/top-matches")
+def top_matches():
+    match_date = request.args.get(
+        "date", date.today().isoformat()
+    )
+
+    data, status = sportapi_get(
+        f"/fixtures/date/{match_date}"
+    )
+
+    if status != 200:
+        return jsonify(data), status
+
+    fixtures = data.get("data", data)
+
+    if isinstance(fixtures, dict):
+        fixtures = fixtures.get("fixtures", [])
+
+    if not isinstance(fixtures, list):
+        return jsonify({
+            "error": "Done match yo pa disponib"
+        }), 404
+
+    scheduled = [
+        m for m in fixtures
+        if m.get("status") in ["NS", "Scheduled"]
+    ][:12]
+
+    team_cache = {}
+    results = []
+
+    for match in scheduled:
+        home_id = match.get("home_id")
+        away_id = match.get("away_id")
+
+        if not home_id or not away_id:
+            continue
+
+        for team_id in [home_id, away_id]:
+            if team_id not in team_cache:
+                team_data, team_status = sportapi_get(
+                    f"/teams/{team_id}"
+                )
+
+                if team_status == 200:
+                    team_info = team_data.get("data", team_data)
+                    team_cache[team_id] = team_info.get("matches", [])
+                else:
+                    team_cache[team_id] = None
+
+        home_games = team_cache.get(home_id)
+        away_games = team_cache.get(away_id)
+
+        if home_games is None or away_games is None:
+            continue
+
+        home = analyze_team_for_top(home_games, home_id)
+        away = analyze_team_for_top(away_games, away_id)
+
+        if not home or not away:
+            continue
+
+        scores = {
+            "over_1_5": (home["over_1_5"] + away["over_1_5"]) / 2,
+            "over_2_5": (home["over_2_5"] + away["over_2_5"]) / 2,
+            "btts": (home["btts"] + away["btts"]) / 2,
+            "team_form": (home["wins"] + away["wins"]) / 2
+        }
+
+        overall = round(
+            sum(scores.values()) / len(scores), 1
+        )
+
+        results.append({
+            "home_team": match.get("home_team"),
+            "away_team": match.get("away_team"),
+            "home_id": home_id,
+            "away_id": away_id,
+            "overall_confidence": overall,
+            "confidence_scores": scores
+        })
+
+    results.sort(
+        key=lambda x: x["overall_confidence"],
+        reverse=True
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "category": "TOP MATCHES",
+        "date": match_date,
+        "matches_analyzed": len(results),
+        "top_5_matches": results[:5],
+        "warning": "Nòt yo baze sou estatistik 5 dènye match yo, yo pa garanti rezilta."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
