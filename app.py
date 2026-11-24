@@ -205,6 +205,113 @@ def team_average(team_id):
         "averages": averages
     })
     
+@app.route("/compare/<int:home_id>/<int:away_id>")
+def compare_teams(home_id, away_id):
+
+    def get_team_analysis(team_id):
+        data, status = sportapi_get(f"/teams/{team_id}")
+
+        if status != 200:
+            return None
+
+        matches = data.get("matches", [])
+
+        played = [
+            m for m in matches
+            if m.get("status") in ["FT", "AET", "PENS"]
+        ]
+
+        played.sort(
+            key=lambda m: m.get("date", ""),
+            reverse=True
+        )
+
+        last5 = played[:5]
+
+        fields = [
+            "shots",
+            "shots_on_target",
+            "fouls",
+            "yellow_cards"
+        ]
+
+        totals = {field: 0 for field in fields}
+        count = 0
+        form = []
+
+        for match in last5:
+            is_home = match.get("home_id") == team_id
+
+            goals_for = (
+                match.get("home_score") if is_home
+                else match.get("away_score")
+            )
+
+            goals_against = (
+                match.get("away_score") if is_home
+                else match.get("home_score")
+            )
+
+            if goals_for is not None and goals_against is not None:
+                form.append(
+                    "W" if goals_for > goals_against
+                    else "D" if goals_for == goals_against
+                    else "L"
+                )
+
+            stats, stat_status = sportapi_get(
+                f"/fixtures/{match.get('id')}/stats"
+            )
+
+            if stat_status != 200:
+                continue
+
+            if not stats.get("available") or not stats.get("data"):
+                continue
+
+            side = "home" if is_home else "away"
+            team_stats = stats["data"].get(side, {})
+
+            if not team_stats:
+                continue
+
+            for field in fields:
+                value = team_stats.get(field)
+
+                if value is not None:
+                    totals[field] += value
+
+            count += 1
+
+        averages = {
+            field: round(value / count, 2) if count else None
+            for field, value in totals.items()
+        }
+
+        return {
+            "team_id": team_id,
+            "matches_found": len(last5),
+            "matches_with_stats": count,
+            "form": form,
+            "averages": averages
+        }
+
+    home = get_team_analysis(home_id)
+    away = get_team_analysis(away_id)
+
+    if home is None or away is None:
+        return jsonify({
+            "error": "Nou pa kapab jwenn done youn nan ekip yo"
+        }), 502
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "comparison": {
+            "home": home,
+            "away": away
+        }
+    })
+            
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
