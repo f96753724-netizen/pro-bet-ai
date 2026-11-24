@@ -66,7 +66,12 @@ def basketball():
         f"/basketball/games/date/{match_date}"
     )
     return jsonify(data), status
-
+@app.route("/stats/<int:fixture_id>")
+def match_stats(fixture_id):
+    data, status = sportapi_get(
+        f"/fixtures/{fixture_id}/stats"
+    )
+    return jsonify(data), status
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
