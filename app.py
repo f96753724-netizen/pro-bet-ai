@@ -262,7 +262,7 @@ def best_matches():
 
         "warning": "Klasman yo baze sou frekans 5 dènye match yo; yo pa garanti rezilta."
     })
-    @app.route("/confidence-score/<int:home_id>/<int:away_id>")
+@app.route("/confidence-score/<int:home_id>/<int:away_id>")
 def confidence_score(home_id, away_id):
     data, status = sportapi_get(f"/teams/{home_id}")
 
