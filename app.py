@@ -698,6 +698,88 @@ def final_analysis(home_id, away_id):
         )
     })
     
+@app.route("/basketball-analyze/<int:game_id>")
+def basketball_analyze(game_id):
+
+    game, status = sportapi_get(
+        f"/basketball/games/{game_id}"
+    )
+
+    if status != 200:
+        return jsonify(game), status
+
+    stats, stats_status = sportapi_get(
+        f"/basketball/games/{game_id}/stats"
+    )
+
+    players, players_status = sportapi_get(
+        f"/basketball/games/{game_id}/players"
+    )
+
+    if stats_status != 200:
+        stats = {"available": False}
+
+    if players_status != 200:
+        players = {"available": False}
+
+    game_data = game.get("data", game)
+    stats_data = stats.get("data", {})
+    players_data = players.get("data", {})
+
+    home = game_data.get("home", {})
+    away = game_data.get("away", {})
+
+    home_stats = stats_data.get("home", {})
+    away_stats = stats_data.get("away", {})
+
+    def player_leaders(team_players):
+        leaders = []
+
+        for item in team_players:
+            player = item.get("player", {})
+            if item.get("dnp"):
+                continue
+
+            leaders.append({
+                "name": player.get("name"),
+                "points": item.get("pts"),
+                "rebounds": item.get("reb"),
+                "assists": item.get("ast"),
+                "three_pointers": item.get("tpm"),
+                "minutes": item.get("minutes")
+            })
+
+        return sorted(
+            leaders,
+            key=lambda x: x.get("points") or 0,
+            reverse=True
+        )[:5]
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "sport": "Basketball",
+        "game_id": game_id,
+        "league": game_data.get("league"),
+        "status": game_data.get("status"),
+        "home": {
+            "name": home.get("name"),
+            "score": home.get("score"),
+            "stats": home_stats,
+            "top_players": player_leaders(
+                players_data.get("home", [])
+            )
+        },
+        "away": {
+            "name": away.get("name"),
+            "score": away.get("score"),
+            "stats": away_stats,
+            "top_players": player_leaders(
+                players_data.get("away", [])
+            )
+        },
+        "warning": "Analiz estatistik, pa garanti rezilta paryaj."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
