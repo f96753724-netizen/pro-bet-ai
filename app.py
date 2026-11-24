@@ -201,15 +201,66 @@ def best_matches():
         key=lambda x: x["expected_goals_indicator"],
         reverse=True
     )
+    def get_rate(frequency):
+        hits, total = frequency.split("/")
+        return int(hits), int(total)
 
+    for match in ranked:
+        h = match["home_stats"]
+        a = match["away_stats"]
+
+        for market in [
+            "over_1_5_frequency",
+            "over_2_5_frequency",
+            "btts_frequency"
+        ]:
+            home_hits, home_total = get_rate(h[market])
+            away_hits, away_total = get_rate(a[market])
+
+            percentage = (
+                (home_hits + away_hits)
+                / (home_total + away_total)
+            ) * 100
+
+            if market == "over_1_5_frequency":
+                match["over_1_5_indicator"] = round(percentage, 1)
+
+            elif market == "over_2_5_frequency":
+                match["over_2_5_indicator"] = round(percentage, 1)
+
+            else:
+                match["btts_indicator"] = round(percentage, 1)
+
+    best_over_15 = sorted(
+        ranked,
+        key=lambda x: x["over_1_5_indicator"],
+        reverse=True
+    )[:5]
+
+    best_over_25 = sorted(
+        ranked,
+        key=lambda x: x["over_2_5_indicator"],
+        reverse=True
+    )[:5]
+
+    best_btts = sorted(
+        ranked,
+        key=lambda x: x["btts_indicator"],
+        reverse=True
+    )[:5]
     return jsonify({
         "bot": "PRO BET AI",
         "category": "BEST MATCHES",
         "date": match_date,
         "matches_checked": min(len(scheduled), 12),
         "matches_analyzed": len(ranked),
+
         "best_matches": ranked[:5],
-        "warning": "Frekans yo baze sou dènye match yo; yo pa garanti rezilta pwochen match la."
+        "best_over_1_5": best_over_15,
+        "best_over_2_5": best_over_25,
+        "best_btts": best_btts,
+
+        "warning": "Klasman yo baze sou frekans 5 dènye match yo; yo pa garanti rezilta."
     })
 @app.route("/basketball")
 def basketball():
