@@ -786,62 +786,7 @@ def basketball_analyze(game_id):
 
     
 
-        if team_score is None or opponent_score is None:
-            continue
-
-        scored.append(team_score)
-        conceded.append(opponent_score)
-
-        if team_score > opponent_score:
-            result_letter = "W"
-            wins += 1
-        elif team_score < opponent_score:
-            result_letter = "L"
-            losses += 1
-        else:
-            result_letter = "D"
-            draws += 1
-
-        history.append({
-            "date": game.get("start"),
-            "opponent": opponent,
-            "team_score": team_score,
-            "opponent_score": opponent_score,
-            "result": result_letter
-        })
-
-    count = len(scored)
-
-    if count == 0:
-        return jsonify({
-            "bot": "PRO BET AI",
-            "error": "Pa jwenn rezilta valab."
-        }), 404
-
-    return jsonify({
-        "bot": "PRO BET AI",
-        "sport": "Basketball",
-        "team_id": team_id,
-        "matches_analyzed": count,
-        "form": history,
-        "record": {
-            "wins": wins,
-            "losses": losses,
-            "draws": draws
-        },
-        "averages": {
-            "points_scored": round(sum(scored) / count, 2),
-            "points_conceded": round(sum(conceded) / count, 2),
-            "total_points": round(
-                sum(scored[i] + conceded[i]
-                    for i in range(count)) / count, 2
-            ),
-            "point_difference": round(
-                (sum(scored) - sum(conceded)) / count, 2
-            )
-        },
-        "warning": "Estatistik istorik, pa garanti rezilta pwochen match."
-    })
+    
     
 @app.route("/basketball/debug-team/<int:team_id>")
 def basketball_debug_team(team_id):
