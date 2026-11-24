@@ -782,12 +782,7 @@ def basketball_analyze(game_id):
     
 
 
-    scored = []
-    conceded = []
-    history = []
-    wins = 0
-    losses = 0
-    draws = 0
+    
 
     for game in finished:
         home = game.get("home", {})
