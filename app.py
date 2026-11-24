@@ -311,7 +311,75 @@ def compare_teams(home_id, away_id):
             "away": away
         }
     })
-            
+       
+@app.route("/predict/<int:home_id>/<int:away_id>")
+def predict_match(home_id, away_id):
+
+    result = compare_teams(home_id, away_id)
+
+    if isinstance(result, tuple):
+        return result
+
+    comparison = result.get_json()["comparison"]
+
+    home = comparison["home"]["averages"]
+    away = comparison["away"]["averages"]
+
+    metrics = [
+        "shots",
+        "shots_on_target",
+        "fouls",
+        "yellow_cards"
+    ]
+
+    predictions = {}
+
+    for metric in metrics:
+        h = home.get(metric)
+        a = away.get(metric)
+
+        if h is None or a is None:
+            predictions[metric] = {
+                "status": "Done ki manke"
+            }
+            continue
+
+        difference = abs(h - a)
+        base = max(h, a, 1)
+
+        gap = (difference / base) * 100
+
+        if gap < 8:
+            confidence = "Ba"
+        elif gap < 18:
+            confidence = "Mwayen"
+        else:
+            confidence = "Wo"
+
+        if h > a:
+            advantage = "home"
+        elif a > h:
+            advantage = "away"
+        else:
+            advantage = "equal"
+
+        predictions[metric] = {
+            "home_average": h,
+            "away_average": a,
+            "advantage": advantage,
+            "historical_gap_percent": round(gap, 1),
+            "confidence_level": confidence
+        }
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "type": "Historical statistical estimate",
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "predictions": predictions,
+        "warning": "Se estimasyon ki baze sou 5 dènye match yo, se pa garanti."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
