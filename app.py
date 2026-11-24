@@ -466,6 +466,132 @@ def full_analysis(home_id, away_id):
         "warning": "Analiz sa a baze sou done istorik; li pa garanti rezilta paryaj."
     })
     
+@app.route("/goals-analysis/<int:home_id>/<int:away_id>")
+def goals_analysis(home_id, away_id):
+
+    def get_goal_stats(team_id):
+        data, status = sportapi_get(f"/teams/{team_id}")
+
+        if status != 200:
+            return None
+
+        matches = data.get("matches", [])
+
+        played = [
+            m for m in matches
+            if m.get("status") in ["FT", "AET", "PENS"]
+            and m.get("home_score") is not None
+            and m.get("away_score") is not None
+        ]
+
+        played.sort(
+            key=lambda m: m.get("date", ""),
+            reverse=True
+        )
+
+        last5 = played[:5]
+
+        total_scored = 0
+        total_conceded = 0
+        over15 = 0
+        over25 = 0
+        over35 = 0
+        btts = 0
+        count = 0
+
+        for match in last5:
+            is_home = match.get("home_id") == team_id
+
+            scored = (
+                match.get("home_score") if is_home
+                else match.get("away_score")
+            )
+
+            conceded = (
+                match.get("away_score") if is_home
+                else match.get("home_score")
+            )
+
+            total = scored + conceded
+
+            total_scored += scored
+            total_conceded += conceded
+
+            if total >= 2:
+                over15 += 1
+            if total >= 3:
+                over25 += 1
+            if total >= 4:
+                over35 += 1
+            if scored > 0 and conceded > 0:
+                btts += 1
+
+            count += 1
+
+        return {
+            "team_id": team_id,
+            "matches_analyzed": count,
+            "average_scored": round(total_scored / count, 2) if count else None,
+            "average_conceded": round(total_conceded / count, 2) if count else None,
+            "over_1_5": over15,
+            "over_2_5": over25,
+            "over_3_5": over35,
+            "btts": btts
+        }
+
+    home = get_goal_stats(home_id)
+    away = get_goal_stats(away_id)
+
+    if home is None or away is None:
+        return jsonify({
+            "error": "Nou pa kapab jwenn done ekip yo"
+        }), 502
+
+    h2h_data, status = sportapi_get(
+        f"/fixtures/h2h/{home_id}/{away_id}"
+    )
+
+    if status != 200:
+        return jsonify(h2h_data), status
+
+    h2h_matches = h2h_data.get("data", [])
+
+    h2h_stats = {
+        "matches_analyzed": 0,
+        "over_1_5": 0,
+        "over_2_5": 0,
+        "over_3_5": 0,
+        "btts": 0
+    }
+
+    for match in h2h_matches:
+        hs = match.get("home_score")
+        aws = match.get("away_score")
+
+        if hs is None or aws is None:
+            continue
+
+        total = hs + aws
+
+        h2h_stats["matches_analyzed"] += 1
+
+        if total >= 2:
+            h2h_stats["over_1_5"] += 1
+        if total >= 3:
+            h2h_stats["over_2_5"] += 1
+        if total >= 4:
+            h2h_stats["over_3_5"] += 1
+        if hs > 0 and aws > 0:
+            h2h_stats["btts"] += 1
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team": home,
+        "away_team": away,
+        "head_to_head_goals": h2h_stats,
+        "warning": "Se frekans istorik, se pa garanti rezilta pwochen match."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
