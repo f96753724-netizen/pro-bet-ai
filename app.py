@@ -808,6 +808,127 @@ def basketball_debug_team(team_id):
         "first_games": games[:3]
     })
     
+@app.route("/basketball/team-last5/<int:team_id>")
+def basketball_team_last5(team_id):
+    result, status = sportapi_get(
+        f"/basketball/teams/{team_id}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    data = result.get("data", result)
+
+    if "team" in data and isinstance(data["team"], dict):
+        team = data["team"]
+    else:
+        team = data
+
+    games = data.get("last_games", result.get("last_games", []))
+
+    if not games:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa gen dènye match ekip sa a nan API a."
+        }), 404
+
+    finished = [
+        g for g in games
+        if g.get("status") in ["FT", "AOT"]
+    ][:5]
+
+    if not finished:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Pa gen ase match fini pou ekip sa a."
+        }), 404
+
+    history = []
+    totals = {
+        "points_for": 0,
+        "points_against": 0,
+        "rebounds": 0,
+        "assists": 0,
+        "three_pointers": 0
+    }
+
+    stats_count = 0
+
+    for game in finished:
+        home = game.get("home", {})
+        away = game.get("away", {})
+
+        is_home = home.get("id") == team_id
+
+        my_team = home if is_home else away
+        opponent = away if is_home else home
+
+        scored = my_team.get("score")
+        conceded = opponent.get("score")
+
+        if scored is None or conceded is None:
+            continue
+
+        totals["points_for"] += scored
+        totals["points_against"] += conceded
+
+        stats_result, stats_status = sportapi_get(
+            f"/basketball/games/{game.get('id')}/stats"
+        )
+
+        team_stats = {}
+
+        if stats_status == 200:
+            stats_data = stats_result.get("data", {})
+            side = "home" if is_home else "away"
+            team_stats = stats_data.get(side, {})
+
+        history.append({
+            "date": game.get("start"),
+            "opponent": opponent.get("name"),
+            "score": f"{scored}-{conceded}",
+            "result": "W" if scored > conceded else "L",
+            "rebounds": team_stats.get("reb"),
+            "assists": team_stats.get("ast"),
+            "three_pointers": team_stats.get("tpm")
+        })
+
+        if team_stats:
+            totals["rebounds"] += team_stats.get("reb", 0)
+            totals["assists"] += team_stats.get("ast", 0)
+            totals["three_pointers"] += team_stats.get("tpm", 0)
+            stats_count += 1
+
+    count = len(history)
+
+    if count == 0:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Nou pa jwenn rezilta match yo."
+        }), 404
+
+    averages = {
+        "points_for": round(totals["points_for"] / count, 1),
+        "points_against": round(totals["points_against"] / count, 1)
+    }
+
+    if stats_count:
+        averages.update({
+            "rebounds": round(totals["rebounds"] / stats_count, 1),
+            "assists": round(totals["assists"] / stats_count, 1),
+            "three_pointers": round(
+                totals["three_pointers"] / stats_count, 1
+            )
+        })
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "team": team.get("name", f"Team {team_id}"),
+        "matches_found": count,
+        "matches": history,
+        "averages": averages
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
