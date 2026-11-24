@@ -380,6 +380,23 @@ def predict_match(home_id, away_id):
         "warning": "Se estimasyon ki baze sou 5 dènye match yo, se pa garanti."
     })
     
+@app.route("/h2h/<int:home_id>/<int:away_id>")
+def head_to_head(home_id, away_id):
+
+    data, status = sportapi_get(
+        f"/fixtures/h2h/{home_id}/{away_id}"
+    )
+
+    if status != 200:
+        return jsonify(data), status
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "head_to_head": data
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
