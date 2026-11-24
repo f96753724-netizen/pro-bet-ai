@@ -56,7 +56,115 @@ def football():
         f"/fixtures/date/{match_date}"
     )
     return jsonify(data), status
+@app.route("/best-matches")
+def best_matches():
+    match_date = request.args.get(
+        "date", date.today().isoformat()
+    )
 
+    result, status = sportapi_get(
+        f"/fixtures/date/{match_date}"
+    )
+
+    if status != 200:
+        return jsonify(result), status
+
+    fixtures = result.get("data", [])
+
+    if not isinstance(fixtures, list):
+        return jsonify({
+            "error": "Fòma done match yo pa kòrèk"
+        }), 502
+
+    ranked = []
+
+    def team_goals(team_id):
+        data, code = sportapi_get(f"/teams/{team_id}")
+
+        if code != 200:
+            return None
+
+        data = data.get("data", data)
+        games = data.get("matches", [])
+
+        finished = [
+            g for g in games
+            if g.get("status") in ["FT", "AET", "PENS"]
+            and g.get("home_score") is not None
+            and g.get("away_score") is not None
+        ][:5]
+
+        if len(finished) < 3:
+            return None
+
+        scored = []
+        conceded = []
+
+        for g in finished:
+            if g.get("home_id") == team_id:
+                scored.append(g["home_score"])
+                conceded.append(g["away_score"])
+            else:
+                scored.append(g["away_score"])
+                conceded.append(g["home_score"])
+
+        return {
+            "matches": len(finished),
+            "average_scored": round(
+                sum(scored) / len(scored), 2
+            ),
+            "average_conceded": round(
+                sum(conceded) / len(conceded), 2
+            )
+        }
+
+    for match in fixtures[:8]:
+        if match.get("status") not in ["NS", "Scheduled"]:
+            continue
+
+        home_id = match.get("home_id")
+        away_id = match.get("away_id")
+
+        if not home_id or not away_id:
+            continue
+
+        home = team_goals(home_id)
+        away = team_goals(away_id)
+
+        if not home or not away:
+            continue
+
+        expected_goals = round(
+            (
+                home["average_scored"]
+                + home["average_conceded"]
+                + away["average_scored"]
+                + away["average_conceded"]
+            ) / 2, 2
+        )
+
+        ranked.append({
+            "fixture_id": match.get("id"),
+            "home_team": match.get("home_team"),
+            "away_team": match.get("away_team"),
+            "expected_goals_indicator": expected_goals,
+            "home_stats": home,
+            "away_stats": away
+        })
+
+    ranked.sort(
+        key=lambda x: x["expected_goals_indicator"],
+        reverse=True
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "category": "BEST MATCHES",
+        "date": match_date,
+        "matches_analyzed": len(ranked),
+        "best_matches": ranked[:5],
+        "warning": "Se endikatè estatistik, se pa garanti."
+    })
 
 @app.route("/basketball")
 def basketball():
