@@ -1850,6 +1850,112 @@ def basketball_team_totals(home_id, away_id):
         "warning": "Estimasyon sou 5 match istorik; pa yon garanti."
     })
     
+@app.route("/menu")
+def main_menu():
+    return """
+    <!DOCTYPE html>
+    <html lang="ht">
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>PRO BET AI</title>
+      <style>
+        body {
+          background: #101827;
+          color: white;
+          font-family: Arial;
+          padding: 20px;
+          text-align: center;
+        }
+        .card {
+          background: #1e293b;
+          padding: 18px;
+          margin: 14px 0;
+          border-radius: 14px;
+        }
+        input {
+          width: 90%;
+          padding: 12px;
+          margin: 7px;
+          border-radius: 8px;
+          border: 0;
+        }
+        button {
+          background: #16a34a;
+          color: white;
+          padding: 12px;
+          width: 95%;
+          border: 0;
+          border-radius: 8px;
+          margin-top: 8px;
+          font-weight: bold;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>🏆 PRO BET AI</h1>
+      <p>Analiz foutbòl ak NBA</p>
+
+      <div class="card">
+        <h2>⚽ FOUTBÒL</h2>
+        <input id="fixture" placeholder="ID match la">
+        <button onclick="go('/analyze/' + val('fixture'))">
+          Analize match
+        </button>
+
+        <input id="fh" placeholder="ID ekip lakay">
+        <input id="fa" placeholder="ID ekip deyò">
+        <button onclick="go('/final-analysis/' + val('fh') + '/' + val('fa'))">
+          Analize 2 ekip yo
+        </button>
+      </div>
+
+      <div class="card">
+        <h2>🏀 NBA</h2>
+        <input id="game" placeholder="ID match NBA">
+        <button onclick="go('/basketball-analyze/' + val('game'))">
+          Analize match NBA
+        </button>
+
+        <input id="bh" placeholder="ID ekip lakay">
+        <input id="ba" placeholder="ID ekip deyò">
+        <button onclick="go('/basketball/compare/' + val('bh') + '/' + val('ba'))">
+          Konpare ekip NBA
+        </button>
+      </div>
+
+      <div class="card">
+        <h2>👤 ANALIZ JWÈ</h2>
+        <input id="player" placeholder="ID jwè NBA">
+        <button onclick="go('/basketball/player-last5/' + val('player'))">
+          5 dènye match jwè
+        </button>
+
+        <input id="pra" placeholder="Liy PRA, egzanp 45.5">
+        <button onclick="go('/basketball/player-pra/' + val('player') + '/' + val('pra'))">
+          Analize PRA
+        </button>
+      </div>
+
+      <script>
+        function val(id) {
+          return document.getElementById(id).value.trim();
+        }
+        function go(url) {
+          if (url.includes("undefined") || url.endsWith("/")) {
+            alert("Tanpri ranpli tout chan yo.");
+            return;
+          }
+          if (url.includes("NaN")) {
+            alert("Tanpri antre yon liy valab.");
+            return;
+          }
+          window.location.href = url;
+        }
+      </script>
+    </body>
+    </html>
+    """
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
