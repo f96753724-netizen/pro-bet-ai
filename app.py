@@ -1020,6 +1020,98 @@ def basketball_compare(home_id, away_id):
         )
     })
     
+@app.route("/basketball/predict/<int:home_id>/<int:away_id>")
+def basketball_predict(home_id, away_id):
+
+    def get_average(team_id):
+        result, status = sportapi_get(
+            f"/basketball/teams/{team_id}"
+        )
+
+        if status != 200:
+            return None
+
+        data = result.get("data", result)
+        games = data.get("last_games", [])
+
+        finished = [
+            g for g in games
+            if g.get("status") in ["FT", "AOT"]
+        ][:5]
+
+        scored_list = []
+        conceded_list = []
+
+        for game in finished:
+            home = game.get("home", {})
+            away = game.get("away", {})
+
+            if home.get("id") == team_id:
+                mine, opponent = home, away
+            elif away.get("id") == team_id:
+                mine, opponent = away, home
+            else:
+                continue
+
+            scored = mine.get("score")
+            conceded = opponent.get("score")
+
+            if scored is None or conceded is None:
+                continue
+
+            scored_list.append(scored)
+            conceded_list.append(conceded)
+
+        if not scored_list:
+            return None
+
+        return {
+            "scored": sum(scored_list) / len(scored_list),
+            "conceded": sum(conceded_list) / len(conceded_list),
+            "matches": len(scored_list)
+        }
+
+    home = get_average(home_id)
+    away = get_average(away_id)
+
+    if not home or not away:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Done 5 dènye match yo pa disponib."
+        }), 404
+
+    home_prediction = round(
+        (home["scored"] + away["conceded"]) / 2
+    )
+
+    away_prediction = round(
+        (away["scored"] + home["conceded"]) / 2
+    )
+
+    difference = home_prediction - away_prediction
+
+    if difference > 0:
+        favorite = "Ekip lakay"
+    elif difference < 0:
+        favorite = "Ekip deyò"
+    else:
+        favorite = "Match egal"
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "prediction": {
+            "home_points": home_prediction,
+            "away_points": away_prediction,
+            "estimated_total_points": (
+                home_prediction + away_prediction
+            ),
+            "favorite": favorite
+        },
+        "home_statistics": home,
+        "away_statistics": away,
+        "warning": "Estimasyon estatistik, se pa rezilta garanti."
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
