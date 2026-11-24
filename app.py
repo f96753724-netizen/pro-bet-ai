@@ -262,6 +262,118 @@ def best_matches():
 
         "warning": "Klasman yo baze sou frekans 5 dènye match yo; yo pa garanti rezilta."
     })
+    @app.route("/confidence-score/<int:home_id>/<int:away_id>")
+def confidence_score(home_id, away_id):
+    data, status = sportapi_get(f"/teams/{home_id}")
+
+    if status != 200:
+        return jsonify(data), status
+
+    home_data = data.get("data", data)
+    home_games = home_data.get("matches", [])
+
+    data, status = sportapi_get(f"/teams/{away_id}")
+
+    if status != 200:
+        return jsonify(data), status
+
+    away_data = data.get("data", data)
+    away_games = away_data.get("matches", [])
+
+    def analyze_team(games, team_id):
+        played = [
+            g for g in games
+            if g.get("status") in ["FT", "AET", "PENS"]
+            and g.get("home_score") is not None
+            and g.get("away_score") is not None
+        ]
+
+        played.sort(
+            key=lambda g: g.get("date", ""),
+            reverse=True
+        )
+
+        last5 = played[:5]
+
+        if len(last5) < 3:
+            return None
+
+        scored = []
+        conceded = []
+        over15 = 0
+        over25 = 0
+        btts = 0
+        wins = 0
+
+        for game in last5:
+            if game.get("home_id") == team_id:
+                gf = game["home_score"]
+                ga = game["away_score"]
+            else:
+                gf = game["away_score"]
+                ga = game["home_score"]
+
+            scored.append(gf)
+            conceded.append(ga)
+
+            if gf + ga >= 2:
+                over15 += 1
+            if gf + ga >= 3:
+                over25 += 1
+            if gf > 0 and ga > 0:
+                btts += 1
+            if gf > ga:
+                wins += 1
+
+        n = len(last5)
+
+        return {
+            "matches": n,
+            "average_scored": sum(scored) / n,
+            "average_conceded": sum(conceded) / n,
+            "over_1_5": over15 / n * 100,
+            "over_2_5": over25 / n * 100,
+            "btts": btts / n * 100,
+            "wins": wins / n * 100
+        }
+
+    home = analyze_team(home_games, home_id)
+    away = analyze_team(away_games, away_id)
+
+    if not home or not away:
+        return jsonify({
+            "error": "Pa gen ase done pou kalkile nòt konfyans lan"
+        }), 404
+
+    scores = {}
+
+    scores["over_1_5"] = round(
+        (home["over_1_5"] + away["over_1_5"]) / 2, 1
+    )
+
+    scores["over_2_5"] = round(
+        (home["over_2_5"] + away["over_2_5"]) / 2, 1
+    )
+
+    scores["btts"] = round(
+        (home["btts"] + away["btts"]) / 2, 1
+    )
+
+    scores["team_form"] = round(
+        (home["wins"] + away["wins"]) / 2, 1
+    )
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "confidence_scores": scores,
+        "team_statistics": {
+            "home": home,
+            "away": away
+        },
+        "warning": "Nòt sa yo se endikatè estatistik sou 5 dènye match yo, se pa pwobabilite garanti."
+    })
 @app.route("/basketball")
 def basketball():
     match_date = request.args.get("date", date.today().isoformat())
