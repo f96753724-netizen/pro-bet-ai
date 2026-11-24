@@ -1,6 +1,38 @@
-from flask import Flask, jsonify
+
+import os
+from datetime import date
+import requests
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
+
+API_URL = "https://sportapi.ai/api"
+
+
+def sportapi_get(endpoint):
+    api_key = os.getenv("SPORTAPI_KEY")
+
+    if not api_key:
+        return {"error": "SPORTAPI_KEY pa konfigire"}, 500
+
+    try:
+        response = requests.get(
+            f"{API_URL}{endpoint}",
+            headers={"X-Api-Key": api_key},
+            timeout=20
+        )
+
+        if response.status_code != 200:
+            return {
+                "error": "SportAPI pa reponn nòmalman",
+                "status_code": response.status_code
+            }, response.status_code
+
+        return response.json(), 200
+
+    except requests.RequestException:
+        return {"error": "Pwoblèm koneksyon ak SportAPI"}, 502
+
 
 @app.route("/")
 def home():
@@ -10,9 +42,32 @@ def home():
         "message": "Bot la pare!"
     })
 
+
 @app.route("/health")
 def health():
     return jsonify({"status": "OK"})
 
+
+@app.route("/football")
+def football():
+    match_date = request.args.get("date", date.today().isoformat())
+
+    data, status = sportapi_get(
+        f"/fixtures/date/{match_date}"
+    )
+    return jsonify(data), status
+
+
+@app.route("/basketball")
+def basketball():
+    match_date = request.args.get("date", date.today().isoformat())
+
+    data, status = sportapi_get(
+        f"/basketball/games/date/{match_date}"
+    )
+    return jsonify(data), status
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+    
