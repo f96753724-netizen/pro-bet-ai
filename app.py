@@ -929,6 +929,97 @@ def basketball_team_last5(team_id):
         "averages": averages
     })
     
+@app.route("/basketball/compare/<int:home_id>/<int:away_id>")
+def basketball_compare(home_id, away_id):
+
+    def get_team_form(team_id):
+        result, status = sportapi_get(
+            f"/basketball/teams/{team_id}"
+        )
+
+        if status != 200:
+            return None
+
+        data = result.get("data", result)
+        games = data.get("last_games", [])
+
+        finished = [
+            g for g in games
+            if g.get("status") in ["FT", "AOT"]
+        ][:5]
+
+        points_for = []
+        points_against = []
+        wins = 0
+        losses = 0
+
+        for game in finished:
+            home = game.get("home", {})
+            away = game.get("away", {})
+
+            if home.get("id") == team_id:
+                my_team = home
+                opponent = away
+            elif away.get("id") == team_id:
+                my_team = away
+                opponent = home
+            else:
+                continue
+
+            scored = my_team.get("score")
+            conceded = opponent.get("score")
+
+            if scored is None or conceded is None:
+                continue
+
+            points_for.append(scored)
+            points_against.append(conceded)
+
+            if scored > conceded:
+                wins += 1
+            else:
+                losses += 1
+
+        count = len(points_for)
+
+        if count == 0:
+            return None
+
+        return {
+            "matches": count,
+            "wins": wins,
+            "losses": losses,
+            "average_points_for": round(sum(points_for) / count, 1),
+            "average_points_against": round(
+                sum(points_against) / count, 1
+            )
+        }
+
+    home = get_team_form(home_id)
+    away = get_team_form(away_id)
+
+    if not home or not away:
+        return jsonify({
+            "bot": "PRO BET AI",
+            "error": "Nou pa jwenn ase done pou konpare ekip yo."
+        }), 404
+
+    return jsonify({
+        "bot": "PRO BET AI",
+        "home_team": {
+            "team_id": home_id,
+            **home
+        },
+        "away_team": {
+            "team_id": away_id,
+            **away
+        },
+        "points_difference": round(
+            home["average_points_for"] -
+            away["average_points_for"], 1
+        )
+    })
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
